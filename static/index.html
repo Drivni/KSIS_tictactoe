@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Сетевые крестики-нолики</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --panel: rgba(255, 255, 255, 0.06);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.65);
+        --line: rgba(255, 255, 255, 0.16);
+        --accent: #7c3aed;
+        --good: #22c55e;
+        --bad: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: radial-gradient(900px 600px at 20% 10%, rgba(124,58,237,0.35), transparent 60%),
+                    radial-gradient(900px 600px at 80% 30%, rgba(34,197,94,0.18), transparent 60%),
+                    var(--bg);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 16px 48px;
+      }
+      .top {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .title {
+        display: grid;
+        gap: 6px;
+      }
+      .title h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+      .title p { margin: 0; color: var(--muted); font-size: 13px; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        backdrop-filter: blur(10px);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+      @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+      .controls {
+        display: grid;
+        gap: 10px;
+      }
+      .grid {
+        width: min(420px, 92vw);
+        aspect-ratio: 1 / 1;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin: 6px auto 0;
+      }
+      button, input {
+        font: inherit;
+        color: var(--text);
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.07);
+        padding: 10px 12px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: 120ms ease;
+      }
+      .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+      .btn.primary { background: rgba(124,58,237,0.22); border-color: rgba(124,58,237,0.45); }
+      .btn.danger { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.35); }
+      .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+      .input {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(0,0,0,0.14);
+        border-radius: 12px;
+        padding: 10px 12px;
+        outline: none;
+      }
+      .input:focus { border-color: rgba(124,58,237,0.55); }
+      .cell {
+        border: 1px solid rgba(255,255,255,0.16);
+        background: rgba(0,0,0,0.16);
+        border-radius: 16px;
+        font-size: 56px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        user-select: none;
+        transition: 120ms ease;
+      }
+      .cell:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.28); }
+      .cell:disabled { cursor: not-allowed; opacity: 0.7; transform: none; }
+      .meta {
+        display: grid;
+        gap: 8px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        width: fit-content;
+        background: rgba(255,255,255,0.05);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+      .dot.on { background: var(--good); }
+      .kv { display: grid; gap: 6px; }
+      .kv .k { color: var(--muted); font-size: 12px; }
+      .kv .v { font-size: 14px; }
+      .log {
+        margin-top: 10px;
+        max-height: 220px;
+        overflow: auto;
+        border-top: 1px solid rgba(255,255,255,0.10);
+        padding-top: 10px;
+        color: rgba(255,255,255,0.75);
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+      code { color: rgba(255,255,255,0.85); }
+      a { color: rgba(167,139,250,0.92); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="title">
+          <h1>Сетевые «Крестики‑нолики»</h1>
+          <p>Комнаты, авто‑роли X/O, очередность ходов, проверка победы/ничьей</p>
+        </div>
+        <div class="badge"><span id="dot" class="dot"></span><span id="conn">Отключено</span></div>
+      </div>
+
+      <div class="row">
+        <div class="panel controls">
+          <div class="kv">
+            <div class="k">Ваш ID (можно оставить пустым)</div>
+            <div class="v"><input id="playerId" class="input" placeholder="например: ivan123" /></div>
+          </div>
+          <div class="kv">
+            <div class="k">ID комнаты (для подключения)</div>
+            <div class="v"><input id="roomId" class="input" placeholder="вставьте ID комнаты" /></div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="createBtn" class="btn primary">Создать комнату</button>
+            <button id="joinBtn" class="btn">Подключиться</button>
+            <button id="leaveBtn" class="btn danger" disabled>Выйти</button>
+          </div>
+
+          <div class="meta">
+            <div class="kv"><div class="k">Комната</div><div class="v"><code id="roomOut">—</code></div></div>
+            <div class="kv"><div class="k">Вы играете за</div><div class="v"><code id="symbolOut">—</code></div></div>
+            <div class="kv"><div class="k">Статус</div><div class="v" id="statusOut">—</div></div>
+            <div class="kv"><div class="k">Ход</div><div class="v"><code id="turnOut">—</code></div></div>
+            <div class="kv"><div class="k">Игроки</div><div class="v"><code id="playersOut">X: —, O: —</code></div></div>
+          </div>
+
+          <div class="log" id="log"></div>
+        </div>
+
+        <div class="panel">
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+      const logEl = el("log");
+      const dot = el("dot");
+      const connEl = el("conn");
+      const roomOut = el("roomOut");
+      const symbolOut = el("symbolOut");
+      const statusOut = el("statusOut");
+      const turnOut = el("turnOut");
+      const playersOut = el("playersOut");
+      const createBtn = el("createBtn");
+      const joinBtn = el("joinBtn");
+      const leaveBtn = el("leaveBtn");
+      const roomIdInput = el("roomId");
+      const playerIdInput = el("playerId");
+
+      let ws = null;
+      let mySymbol = null;
+      let myPlayerId = null;
+      let roomId = null;
+      let state = null;
+
+      function log(msg) {
+        const ts = new Date().toLocaleTimeString();
+        logEl.textContent = `[${ts}] ${msg}\n` + logEl.textContent;
+      }
+
+      function setConnected(on) {
+        dot.classList.toggle("on", on);
+        connEl.textContent = on ? "Подключено" : "Отключено";
+      }
+
+      function wsUrl() {
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        return `${proto}://${location.host}/ws`;
+      }
+
+      function resetUi() {
+        roomOut.textContent = "—";
+        symbolOut.textContent = "—";
+        statusOut.textContent = "—";
+        turnOut.textContent = "—";
+        playersOut.textContent = "X: —, O: —";
+        mySymbol = null;
+        roomId = null;
+        state = null;
+        renderBoard(Array(9).fill(""));
+        leaveBtn.disabled = true;
+      }
+
+      function renderBoard(board) {
+        const grid = el("grid");
+        if (!grid.dataset.ready) {
+          grid.innerHTML = "";
+          for (let i = 0; i < 9; i++) {
+            const b = document.createElement("button");
+            b.className = "cell";
+            b.type = "button";
+            b.dataset.idx = String(i);
+            b.addEventListener("click", () => sendMove(i));
+            grid.appendChild(b);
+          }
+          grid.dataset.ready = "1";
+        }
+
+        const cells = grid.querySelectorAll(".cell");
+        cells.forEach((c, i) => {
+          c.textContent = board[i] || "";
+          const canClick =
+            ws &&
+            ws.readyState === WebSocket.OPEN &&
+            state &&
+            state.status === "playing" &&
+            mySymbol &&
+            state.turn === mySymbol &&
+            board[i] === "";
+          c.disabled = !canClick;
+        });
+      }
+
+      function applyState(s) {
+        state = s;
+        roomOut.textContent = s.room_id;
+        statusOut.textContent =
+          s.status === "waiting"
+            ? "Ожидание второго игрока"
+            : s.status === "playing"
+            ? "Игра идёт"
+            : s.winner
+            ? `Игра завершена — победил ${s.winner}`
+            : "Игра завершена — ничья";
+        turnOut.textContent = s.status === "playing" ? s.turn : "—";
+        const px = s.players?.X ?? "—";
+        const po = s.players?.O ?? "—";
+        playersOut.textContent = `X: ${px}, O: ${po}`;
+        renderBoard(s.board || Array(9).fill(""));
+      }
+
+      function connect(joinPayload) {
+        if (ws) try { ws.close(); } catch {}
+        ws = new WebSocket(wsUrl());
+        setConnected(false);
+
+        ws.addEventListener("open", () => {
+          setConnected(true);
+          ws.send(JSON.stringify(joinPayload));
+          leaveBtn.disabled = false;
+        });
+
+        ws.addEventListener("close", () => {
+          setConnected(false);
+          log("Соединение закрыто");
+          ws = null;
+          resetUi();
+        });
+
+        ws.addEventListener("message", (evt) => {
+          let msg = null;
+          try { msg = JSON.parse(evt.data); } catch { return; }
+
+          if (msg.type === "joined") {
+            mySymbol = msg.symbol;
+            myPlayerId = msg.player_id;
+            roomId = msg.room_id;
+            roomIdInput.value = roomId;
+            symbolOut.textContent = mySymbol;
+            log(`Вы подключились: комната=${roomId}, символ=${mySymbol}, id=${myPlayerId}`);
+            return;
+          }
+
+          if (msg.type === "state") {
+            applyState(msg);
+            return;
+          }
+
+          if (msg.type === "error") {
+            log(`Ошибка: ${msg.message}`);
+            return;
+          }
+        });
+      }
+
+      function sendMove(i) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "move", cell: i }));
+      }
+
+      createBtn.addEventListener("click", () => {
+        const pid = playerIdInput.value.trim();
+        connect({ type: "join", action: "create", player_id: pid || null });
+      });
+
+      joinBtn.addEventListener("click", () => {
+        const rid = roomIdInput.value.trim();
+        if (!rid) { log("Введите ID комнаты"); return; }
+        const pid = playerIdInput.value.trim();
+        connect({ type: "join", action: "join", room_id: rid, player_id: pid || null });
+      });
+
+      leaveBtn.addEventListener("click", () => {
+        if (ws) ws.close();
+      });
+
+      resetUi();
+      log("Откройте эту страницу в двух вкладках: создайте комнату и подключитесь по ID.");
+    </script>
+  </body>
+</html>
